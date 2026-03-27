@@ -34,7 +34,7 @@
     .then(data => {
       quizData = data;
       questions = data.questions;
-      renderConsent();
+      renderQuestion(0);
     })
     .catch(err => {
       container.innerHTML = '<p style="padding:40px;text-align:center;">Не удалось загрузить данные квиза.</p>';
@@ -227,7 +227,8 @@
     if (btnBack.disabled) return;
 
     if (currentIndex === 0) {
-      transitionTo(() => renderConsent());
+      // Already at first question, can't go back further
+      return;
     } else {
       transitionTo(() => renderQuestion(currentIndex - 1));
     }
