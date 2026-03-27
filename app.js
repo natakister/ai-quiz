@@ -28,13 +28,41 @@
   let currentIndex = -1;     // -1 = consent screen, 0..N = questions
   const answers = {};        // { q1: "b", q3: ["a","c"], q6: "free text", ... }
 
+  // ── Progress persistence ───────────────────────────────────────
+  const STORAGE_KEY = 'ai_quiz_progress';
+
+  function saveProgress() {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({
+        answers: answers,
+        index: currentIndex
+      }));
+    } catch (e) { /* silent */ }
+  }
+
+  function loadProgress() {
+    try {
+      const saved = JSON.parse(localStorage.getItem(STORAGE_KEY));
+      if (saved && saved.answers) {
+        Object.assign(answers, saved.answers);
+        return saved.index || 0;
+      }
+    } catch (e) { /* silent */ }
+    return 0;
+  }
+
+  function clearProgress() {
+    try { localStorage.removeItem(STORAGE_KEY); } catch (e) { /* silent */ }
+  }
+
   // ── Init ─────────────────────────────────────────────────────────
   fetch('data.json')
     .then(r => r.json())
     .then(data => {
       quizData = data;
       questions = data.questions;
-      renderQuestion(0);
+      const startIndex = loadProgress();
+      renderQuestion(startIndex);
     })
     .catch(err => {
       container.innerHTML = '<p style="padding:40px;text-align:center;">Не удалось загрузить данные квиза.</p>';
@@ -131,6 +159,7 @@
         list.querySelectorAll('.option-btn').forEach(b => b.classList.remove('selected'));
         btn.classList.add('selected');
         answers[q.id] = opt.id;
+        saveProgress();
         updateNextButton();
       });
       list.appendChild(btn);
@@ -158,6 +187,7 @@
           selected.push(b.dataset.optionId);
         });
         answers[q.id] = selected;
+        saveProgress();
         updateNextButton();
       });
       list.appendChild(btn);
@@ -177,6 +207,7 @@
     }
     textarea.addEventListener('input', () => {
       answers[q.id] = textarea.value.trim();
+      saveProgress();
       updateNextButton();
     });
     container.appendChild(textarea);
@@ -217,9 +248,13 @@
 
     const isLast = (currentIndex === questions.length - 1);
     if (isLast) {
+      clearProgress();
       finishQuiz();
     } else {
-      transitionTo(() => renderQuestion(currentIndex + 1));
+      transitionTo(() => {
+        renderQuestion(currentIndex + 1);
+        saveProgress();
+      });
     }
   });
 
