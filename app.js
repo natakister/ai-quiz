@@ -41,7 +41,7 @@
 
   // ── Persistence ────────────────────────────────────────────────
   // Bump QUIZ_VERSION to force-clear all user data (for testing / content updates)
-  const QUIZ_VERSION = '7';
+  const QUIZ_VERSION = '8';
   const VERSION_KEY = 'ai_quiz_version';
   const PROGRESS_KEY = 'ai_quiz_progress';
   const RESULT_KEY = 'ai_quiz_result';
@@ -127,21 +127,23 @@
 
   function renderMultiOptions(q) {
     const list = el('div', 'options-list');
-    // Find "none" option (e.g. Q4 option "g" = "Ничего из перечисленного")
-    const noneId = (q.options.find(o => o.score === 1 && o.id === 'g') || {}).id;
+    // Find exclusive options (e.g. "Пока ни для чего", "Ничего из перечисленного")
+    const exclusiveIds = q.options.filter(o => o.exclusive).map(o => o.id);
 
     q.options.forEach(opt => {
       const btn = createOptionButton(opt, 'checkbox');
       if (Array.isArray(answers[q.id]) && answers[q.id].includes(opt.id)) btn.classList.add('selected');
       btn.addEventListener('click', () => {
-        if (opt.id === noneId) {
-          // "Ничего" clicked → deselect all others
+        if (exclusiveIds.includes(opt.id)) {
+          // Exclusive option → deselect all others
           list.querySelectorAll('.option-btn').forEach(b => b.classList.remove('selected'));
           btn.classList.add('selected');
         } else {
-          // Regular option → deselect "ничего"
-          const noneBtn = list.querySelector('[data-option-id="' + noneId + '"]');
-          if (noneBtn) noneBtn.classList.remove('selected');
+          // Regular option → deselect all exclusive options
+          exclusiveIds.forEach(eid => {
+            const exBtn = list.querySelector('[data-option-id="' + eid + '"]');
+            if (exBtn) exBtn.classList.remove('selected');
+          });
           btn.classList.toggle('selected');
         }
         const sel = [];
