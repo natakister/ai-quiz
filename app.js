@@ -40,8 +40,20 @@
   const LEVEL_TRACKS = { 1:'«Набор AI-инструментов»', 2:'«Набор AI-инструментов»', 3:'«Создавай с AI»', 4:'«Создавай с AI»', 5:'' };
 
   // ── Persistence ────────────────────────────────────────────────
+  // Bump QUIZ_VERSION to force-clear all user data (for testing / content updates)
+  const QUIZ_VERSION = '2';
+  const VERSION_KEY = 'ai_quiz_version';
   const PROGRESS_KEY = 'ai_quiz_progress';
   const RESULT_KEY = 'ai_quiz_result';
+
+  // Version check — clear stale data
+  try {
+    if (localStorage.getItem(VERSION_KEY) !== QUIZ_VERSION) {
+      localStorage.removeItem(PROGRESS_KEY);
+      localStorage.removeItem(RESULT_KEY);
+      localStorage.setItem(VERSION_KEY, QUIZ_VERSION);
+    }
+  } catch(e) {}
 
   function saveProgress() {
     try { localStorage.setItem(PROGRESS_KEY, JSON.stringify({ answers, index: currentIndex })); } catch(e) {}
