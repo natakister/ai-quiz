@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Уровень 4 — Изобретатель</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; overflow-x: hidden; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  background-color: var(--tg-theme-bg-color, #ffffff);
+  color: var(--tg-theme-text-color, #1a1a1a);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+.container {
+  max-width: 480px;
+  margin: 0 auto;
+  padding: 16px 20px 40px;
+}
+.back-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--tg-theme-link-color, #2481cc);
+  text-decoration: none;
+  padding: 8px 0;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.back-link:active { opacity: 0.7; }
+
+.badge-wrapper { text-align: center; margin: 24px 0 16px; }
+.level-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  background: #FF9800;
+  color: #fff;
+  font-size: 32px;
+  font-weight: 700;
+  box-shadow: 0 4px 16px rgba(255, 152, 0, 0.3);
+}
+.level-title {
+  text-align: center;
+  font-size: 28px;
+  font-weight: 800;
+  margin-bottom: 4px;
+}
+.level-track {
+  text-align: center;
+  font-size: 15px;
+  color: var(--tg-theme-hint-color, #999);
+  margin-bottom: 24px;
+}
+
+.quote-block {
+  background: linear-gradient(135deg, rgba(255,152,0,0.08), rgba(255,152,0,0.03));
+  border-left: 3px solid #FF9800;
+  border-radius: 0 12px 12px 0;
+  padding: 16px 18px;
+  margin-bottom: 32px;
+  font-size: 15px;
+  font-style: italic;
+  line-height: 1.6;
+  color: var(--tg-theme-text-color, #1a1a1a);
+}
+
+.section-title {
+  font-size: 18px;
+  font-weight: 700;
+  margin-bottom: 14px;
+}
+
+.tool-card {
+  background-color: var(--tg-theme-secondary-bg-color, #f4f4f5);
+  border-radius: 12px;
+  padding: 14px 16px;
+  margin-bottom: 10px;
+}
+.tool-name {
+  font-size: 15px;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+.tool-name a {
+  color: var(--tg-theme-link-color, #2481cc);
+  text-decoration: none;
+  cursor: pointer;
+}
+.tool-name a:active { opacity: 0.7; }
+.tool-desc {
+  font-size: 14px;
+  color: var(--tg-theme-hint-color, #888);
+  line-height: 1.45;
+}
+
+.steps-list { margin-bottom: 32px; }
+.step-item {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 14px;
+  align-items: flex-start;
+}
+.step-number {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: #FF9800;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 1px;
+}
+.step-text {
+  font-size: 15px;
+  line-height: 1.5;
+  flex: 1;
+}
+
+.divider {
+  height: 1px;
+  background-color: var(--tg-theme-secondary-bg-color, #eee);
+  margin: 28px 0;
+}
+
+.footer {
+  text-align: center;
+  font-size: 13px;
+  color: var(--tg-theme-hint-color, #999);
+  padding-top: 8px;
+  padding-bottom: 24px;
+  line-height: 1.5;
+}
+</style>
+</head>
+<body>
+<div class="container">
+  <a class="back-link" onclick="window.history.back(); return false;">← Назад к результатам</a>
+
+  <div class="badge-wrapper">
+    <div class="level-badge">4</div>
+  </div>
+  <div class="level-title">Изобретатель</div>
+  <div class="level-track">Трек: «Создавай с AI»</div>
+
+  <div class="quote-block">
+    Ты уже изобретаешь — строишь, пробуешь, экспериментируешь. Но пока каждое изобретение живёт отдельно. Что если собрать из них систему?
+  </div>
+
+  <div class="section-title">🧰 Твоя подборка инструментов</div>
+
+  <div class="tool-card">
+    <div class="tool-name"><a onclick="Telegram.WebApp.openLink('https://docs.anthropic.com/en/docs/claude-code'); return false;">Claude Code</a> / <a onclick="Telegram.WebApp.openLink('https://cursor.sh'); return false;">Cursor</a></div>
+    <div class="tool-desc">AI-кодинг: описываешь что хочешь — AI пишет код.</div>
+  </div>
+
+  <div class="tool-card">
+    <div class="tool-name"><a onclick="Telegram.WebApp.openLink('https://n8n.io'); return false;">n8n</a> (self-hosted)</div>
+    <div class="tool-desc">Мощные воркфлоу с ветвлениями, API, обработкой данных. Бесплатно.</div>
+  </div>
+
+  <div class="tool-card">
+    <div class="tool-name">CLAUDE.md</div>
+    <div class="tool-desc">Конфигурационный файл: контекст проекта, правила, стиль.</div>
+  </div>
+
+  <div class="tool-card">
+    <div class="tool-name"><a onclick="Telegram.WebApp.openLink('https://modelcontextprotocol.io'); return false;">MCP</a> (Model Context Protocol)</div>
+    <div class="tool-desc">Подключение AI к внешним сервисам напрямую.</div>
+  </div>
+
+  <div class="divider"></div>
+
+  <div class="section-title">📋 Мини-гайд: От поделок к системе</div>
+
+  <div class="steps-list">
+    <div class="step-item">
+      <div class="step-number">1</div>
+      <div class="step-text">Составь карту AI-инструментов: что, для чего, как связаны. Найди разрывы.</div>
+    </div>
+    <div class="step-item">
+      <div class="step-number">2</div>
+      <div class="step-text">Напиши CLAUDE.md для главного проекта: контекст, цели, правила, стиль.</div>
+    </div>
+    <div class="step-item">
+      <div class="step-number">3</div>
+      <div class="step-text">Подключи один MCP-коннектор (Google Calendar, файловая система).</div>
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+  <div class="footer">
+    Этот гайд подготовлен авторами квиза —<br>Натой Кистер и Олей Сохневой
+  </div>
+</div>
+
+<script>
+Telegram.WebApp.ready();
+Telegram.WebApp.expand();
+</script>
+</body>
+</html>
