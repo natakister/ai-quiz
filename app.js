@@ -41,7 +41,7 @@
 
   // ── Persistence ────────────────────────────────────────────────
   // Bump QUIZ_VERSION to force-clear all user data (for testing / content updates)
-  const QUIZ_VERSION = '4';
+  const QUIZ_VERSION = '5';
   const VERSION_KEY = 'ai_quiz_version';
   const PROGRESS_KEY = 'ai_quiz_progress';
   const RESULT_KEY = 'ai_quiz_result';
@@ -213,20 +213,34 @@
     const track = getTrackKey();
     const cta = quizData.cta[track];
 
-    const screen = el('div', 'cta-screen');
-    screen.style.cssText = 'padding:20px 0;';
+    const screen = el('div', '');
+    screen.style.cssText = 'display:flex;flex-direction:column;align-items:center;padding:30px 0;text-align:center;';
 
-    // Intro: "спасибо, сейчас покажем результат"
-    const intro = el('div', '', quizData.cta.intro);
-    intro.style.cssText = 'font-size:15px;line-height:1.6;white-space:pre-line;color:var(--tg-theme-hint-color,#999);margin-bottom:16px;';
-    screen.appendChild(intro);
+    // Big emoji
+    const icon = el('div', '', '\uD83C\uDFAF');
+    icon.style.cssText = 'font-size:56px;margin-bottom:16px;';
+    screen.appendChild(icon);
 
-    const text = el('div', '', '');
-    text.style.cssText = 'font-size:16px;line-height:1.6;white-space:pre-line;margin-bottom:24px;';
-    text.textContent = cta.text;
-    screen.appendChild(text);
+    // Title
+    const title = el('div', '', quizData.cta.intro);
+    title.style.cssText = 'font-size:24px;font-weight:800;margin-bottom:8px;';
+    screen.appendChild(title);
+
+    // Subtitle
+    const sub = el('div', '', quizData.cta.intro_sub);
+    sub.style.cssText = 'font-size:16px;color:var(--tg-theme-hint-color,#999);margin-bottom:24px;';
+    screen.appendChild(sub);
+
+    // Divider
+    const divider = el('div', '');
+    divider.style.cssText = 'width:40px;height:3px;background:var(--tg-theme-button-color,#2481cc);border-radius:2px;margin-bottom:24px;';
+    screen.appendChild(divider);
 
     if (track === 'architect') {
+      const text = el('div', '', cta.value);
+      text.style.cssText = 'font-size:15px;line-height:1.6;text-align:left;margin-bottom:24px;width:100%;';
+      screen.appendChild(text);
+
       const yesBtn = makeBtn('Да, держите в курсе', 'var(--tg-theme-button-color,#2481cc)', () => {
         ctaResponse.cta_reaction = 'architect_yes';
         transitionTo(() => renderCtaContact());
@@ -239,7 +253,12 @@
       screen.appendChild(yesBtn);
       screen.appendChild(noBtn);
     } else {
-      const btn = makeBtn('Окей, расскажу \U0001f44d', 'var(--tg-theme-button-color,#2481cc)', () => {
+      // Ask text
+      const ask = el('div', '', quizData.cta.intro_ask);
+      ask.style.cssText = 'font-size:15px;line-height:1.6;white-space:pre-line;text-align:left;margin-bottom:24px;width:100%;';
+      screen.appendChild(ask);
+
+      const btn = makeBtn('Ок, хорошо', 'var(--tg-theme-button-color,#2481cc)', () => {
         ctaResponse.cta_reaction = 'details';
         transitionTo(() => renderCtaPrice());
       });
@@ -254,23 +273,34 @@
     container.innerHTML = '';
 
     const track = getTrackKey();
-    const screen = el('div', 'cta-screen');
+    const trackData = quizData.cta[track];
+    const screen = el('div', '');
     screen.style.cssText = 'padding:20px 0;';
 
-    // Value proposition first
-    const valueKey = track === 'tools' ? 'price_intro_tools' : 'price_intro_create';
-    const valueText = el('div', '', quizData.cta[valueKey]);
-    valueText.style.cssText = 'font-size:15px;line-height:1.7;white-space:pre-line;margin-bottom:16px;';
-    screen.appendChild(valueText);
+    // Intensive name
+    const nameEl = el('div', '', trackData.name);
+    nameEl.style.cssText = 'font-size:22px;font-weight:800;margin-bottom:16px;';
+    screen.appendChild(nameEl);
 
-    // Price at the end
-    const priceText = el('div', '', quizData.cta.price_text);
-    priceText.style.cssText = 'font-size:18px;font-weight:700;margin-bottom:20px;';
-    screen.appendChild(priceText);
+    // Value description
+    const valueEl = el('div', '', trackData.value);
+    valueEl.style.cssText = 'font-size:15px;line-height:1.6;margin-bottom:20px;';
+    screen.appendChild(valueEl);
 
-    const subtitle = el('div', '', 'Как тебе?');
-    subtitle.style.cssText = 'font-size:16px;font-weight:600;margin-bottom:16px;';
-    screen.appendChild(subtitle);
+    // Format
+    const formatEl = el('div', '', trackData.format);
+    formatEl.style.cssText = 'font-size:14px;line-height:1.8;white-space:pre-line;padding:14px 18px;background:var(--tg-theme-secondary-bg-color,#f4f4f5);border-radius:12px;margin-bottom:16px;';
+    screen.appendChild(formatEl);
+
+    // Price
+    const priceEl = el('div', '', quizData.cta.price_text);
+    priceEl.style.cssText = 'font-size:20px;font-weight:700;margin-bottom:24px;';
+    screen.appendChild(priceEl);
+
+    // Question
+    const question = el('div', '', quizData.cta.price_question);
+    question.style.cssText = 'font-size:17px;font-weight:700;margin-bottom:16px;';
+    screen.appendChild(question);
 
     const options = el('div', '');
     options.style.cssText = 'display:flex;flex-direction:column;gap:10px;';
