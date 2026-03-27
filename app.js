@@ -41,7 +41,7 @@
 
   // ── Persistence ────────────────────────────────────────────────
   // Bump QUIZ_VERSION to force-clear all user data (for testing / content updates)
-  const QUIZ_VERSION = '3';
+  const QUIZ_VERSION = '4';
   const VERSION_KEY = 'ai_quiz_version';
   const PROGRESS_KEY = 'ai_quiz_progress';
   const RESULT_KEY = 'ai_quiz_result';
@@ -216,9 +216,10 @@
     const screen = el('div', 'cta-screen');
     screen.style.cssText = 'padding:20px 0;';
 
-    const icon = el('div', '', '💡');
-    icon.style.cssText = 'font-size:40px;text-align:center;margin-bottom:16px;';
-    screen.appendChild(icon);
+    // Intro: "спасибо, сейчас покажем результат"
+    const intro = el('div', '', quizData.cta.intro);
+    intro.style.cssText = 'font-size:15px;line-height:1.6;white-space:pre-line;color:var(--tg-theme-hint-color,#999);margin-bottom:16px;';
+    screen.appendChild(intro);
 
     const text = el('div', '', '');
     text.style.cssText = 'font-size:16px;line-height:1.6;white-space:pre-line;margin-bottom:24px;';
@@ -226,7 +227,6 @@
     screen.appendChild(text);
 
     if (track === 'architect') {
-      // Architect: simple yes/no
       const yesBtn = makeBtn('Да, держите в курсе', 'var(--tg-theme-button-color,#2481cc)', () => {
         ctaResponse.cta_reaction = 'architect_yes';
         transitionTo(() => renderCtaContact());
@@ -239,8 +239,7 @@
       screen.appendChild(yesBtn);
       screen.appendChild(noBtn);
     } else {
-      // Show price screen
-      const btn = makeBtn('Расскажите подробнее', 'var(--tg-theme-button-color,#2481cc)', () => {
+      const btn = makeBtn('Окей, расскажу \U0001f44d', 'var(--tg-theme-button-color,#2481cc)', () => {
         ctaResponse.cta_reaction = 'details';
         transitionTo(() => renderCtaPrice());
       });
@@ -254,16 +253,23 @@
     navigation.classList.add('hidden');
     container.innerHTML = '';
 
+    const track = getTrackKey();
     const screen = el('div', 'cta-screen');
     screen.style.cssText = 'padding:20px 0;';
 
-    const priceText = el('div', '', '');
-    priceText.style.cssText = 'font-size:16px;line-height:1.6;white-space:pre-line;margin-bottom:20px;';
-    priceText.textContent = quizData.cta.price_text;
+    // Value proposition first
+    const valueKey = track === 'tools' ? 'price_intro_tools' : 'price_intro_create';
+    const valueText = el('div', '', quizData.cta[valueKey]);
+    valueText.style.cssText = 'font-size:15px;line-height:1.7;white-space:pre-line;margin-bottom:16px;';
+    screen.appendChild(valueText);
+
+    // Price at the end
+    const priceText = el('div', '', quizData.cta.price_text);
+    priceText.style.cssText = 'font-size:18px;font-weight:700;margin-bottom:20px;';
     screen.appendChild(priceText);
 
     const subtitle = el('div', '', 'Как тебе?');
-    subtitle.style.cssText = 'font-size:18px;font-weight:700;margin-bottom:16px;';
+    subtitle.style.cssText = 'font-size:16px;font-weight:600;margin-bottom:16px;';
     screen.appendChild(subtitle);
 
     const options = el('div', '');
@@ -388,8 +394,8 @@
 
     // Guide buttons
     const wrap = el('div', '', '', 'display:flex;flex-direction:column;gap:10px;width:100%;margin-bottom:24px;');
+    wrap.appendChild(makeCardBtn('\uD83D\uDCCB Мини-гайд: твои шаги к следующему уровню', color, () => { window.location.href = 'guide-' + level + '.html'; }));
     wrap.appendChild(makeCardBtn('\uD83E\uDDF0 Подборка инструментов', color, () => { window.location.href = 'guide-' + level + '.html'; }));
-    wrap.appendChild(makeCardBtn('\uD83D\uDCCB Мини-гайд: шаги к следующему уровню', color, () => { window.location.href = 'guide-' + level + '.html'; }));
     card.appendChild(wrap);
 
     // Hint
