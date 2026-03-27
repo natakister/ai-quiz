@@ -1,258 +1,106 @@
 /**
  * AI Level Quiz — Telegram Web App
  *
- * Three states:
- * 1. Quiz in progress → questions with saved progress
- * 2. Quiz complete → result card with level + guide links
- * 3. Reopened after completion → result card (no re-take)
+ * Flow: Questions → CTA (offer → price → contact) → Result card
+ * All in WebApp. Bot only receives final data via sendData().
  */
 
 (function () {
   'use strict';
 
-  // ── Telegram WebApp integration ──────────────────────────────────
   const tg = window.Telegram && window.Telegram.WebApp;
-  if (tg) {
-    tg.ready();
-    tg.expand();
-  }
+  if (tg) { tg.ready(); tg.expand(); }
 
-  // ── DOM elements ─────────────────────────────────────────────────
+  // ── DOM ────────────────────────────────────────────────────────
   const container = document.getElementById('question-container');
   const progressFill = document.getElementById('progress-fill');
   const navigation = document.getElementById('navigation');
   const btnBack = document.getElementById('btn-back');
   const btnNext = document.getElementById('btn-next');
 
-  // ── State ────────────────────────────────────────────────────────
+  // ── State ──────────────────────────────────────────────────────
   let quizData = null;
   let questions = [];
   let currentIndex = -1;
   const answers = {};
 
+  // CTA state
+  let ctaResponse = {};  // { price_reaction, price_comment, contact_info }
+
   // ── Level data ─────────────────────────────────────────────────
-  const LEVEL_NAMES = {
-    1: 'Наблюдатель',
-    2: 'Собеседник',
-    3: 'Дирижёр',
-    4: 'Изобретатель',
-    5: 'Архитектор'
-  };
-
-  const LEVEL_COLORS = {
-    1: '#4CAF50',
-    2: '#2196F3',
-    3: '#9C27B0',
-    4: '#FF9800',
-    5: '#F44336'
-  };
-
+  const LEVEL_NAMES = { 1:'Наблюдатель', 2:'Собеседник', 3:'Дирижёр', 4:'Изобретатель', 5:'Архитектор' };
+  const LEVEL_COLORS = { 1:'#4CAF50', 2:'#2196F3', 3:'#9C27B0', 4:'#FF9800', 5:'#F44336' };
   const LEVEL_PHRASES = {
-    1: 'Ты пока наблюдаешь со стороны — и это нормально. Но пока ты наблюдаешь, AI уже пишет письма, анализирует документы и планирует отпуск за твоих коллег.',
-    2: 'Вы с AI на «вы» — вежливо общаетесь, но пока не доверяете ему серьёзные дела. А зря — он умеет гораздо больше, чем переписывать письма.',
-    3: 'Ты уже дирижируешь — AI делает то, что ты говоришь. Но представь: он мог бы делать это сам, без дирижёрской палочки. Знать твои задачи, контекст и правила — и действовать.',
-    4: 'Ты уже изобретаешь — строишь, пробуешь, экспериментируешь. Но пока каждое изобретение живёт отдельно. Что если собрать из них систему, которая работает как единый организм?',
-    5: 'Ты уже архитектор — у тебя есть своя система, и ты знаешь, как она устроена. Мы тебя не будем учить — но, кажется, нам есть о чём поговорить.'
+    1:'Ты пока наблюдаешь со стороны — и это нормально. Но пока ты наблюдаешь, AI уже пишет письма, анализирует документы и планирует отпуск за твоих коллег.',
+    2:'Вы с AI на «вы» — вежливо общаетесь, но пока не доверяете ему серьёзные дела. А зря — он умеет гораздо больше, чем переписывать письма.',
+    3:'Ты уже дирижируешь — AI делает то, что ты говоришь. Но представь: он мог бы делать это сам, без дирижёрской палочки. Знать твои задачи, контекст и правила — и действовать.',
+    4:'Ты уже изобретаешь — строишь, пробуешь, экспериментируешь. Но пока каждое изобретение живёт отдельно. Что если собрать из них систему, которая работает как единый организм?',
+    5:'Ты уже архитектор — у тебя есть своя система, и ты знаешь, как она устроена. Мы тебя не будем учить — но, кажется, нам есть о чём поговорить.'
   };
-
-  const LEVEL_TRACKS = {
-    1: '«Набор AI-инструментов»',
-    2: '«Набор AI-инструментов»',
-    3: '«Создавай с AI»',
-    4: '«Создавай с AI»',
-    5: ''
-  };
+  const LEVEL_TRACKS = { 1:'«Набор AI-инструментов»', 2:'«Набор AI-инструментов»', 3:'«Создавай с AI»', 4:'«Создавай с AI»', 5:'' };
 
   // ── Persistence ────────────────────────────────────────────────
   const PROGRESS_KEY = 'ai_quiz_progress';
   const RESULT_KEY = 'ai_quiz_result';
 
   function saveProgress() {
-    try {
-      localStorage.setItem(PROGRESS_KEY, JSON.stringify({
-        answers: answers,
-        index: currentIndex
-      }));
-    } catch (e) { /* silent */ }
+    try { localStorage.setItem(PROGRESS_KEY, JSON.stringify({ answers, index: currentIndex })); } catch(e) {}
   }
-
   function loadProgress() {
     try {
-      const saved = JSON.parse(localStorage.getItem(PROGRESS_KEY));
-      if (saved && saved.answers) {
-        Object.assign(answers, saved.answers);
-        return saved.index || 0;
-      }
-    } catch (e) { /* silent */ }
+      const s = JSON.parse(localStorage.getItem(PROGRESS_KEY));
+      if (s && s.answers) { Object.assign(answers, s.answers); return s.index || 0; }
+    } catch(e) {}
     return 0;
   }
+  function clearProgress() { try { localStorage.removeItem(PROGRESS_KEY); } catch(e) {} }
+  function saveResult(level, score) { try { localStorage.setItem(RESULT_KEY, JSON.stringify({level,score})); } catch(e) {} }
+  function loadResult() { try { return JSON.parse(localStorage.getItem(RESULT_KEY)); } catch(e) { return null; } }
 
-  function clearProgress() {
-    try { localStorage.removeItem(PROGRESS_KEY); } catch (e) { /* silent */ }
-  }
-
-  function saveResult(level, score) {
-    try {
-      localStorage.setItem(RESULT_KEY, JSON.stringify({ level: level, score: score }));
-    } catch (e) { /* silent */ }
-  }
-
-  function loadResult() {
-    try {
-      return JSON.parse(localStorage.getItem(RESULT_KEY));
-    } catch (e) { return null; }
-  }
-
-  // ── Init ─────────────────────────────────────────────────────────
-  fetch('data.json')
-    .then(r => r.json())
-    .then(data => {
-      quizData = data;
-      questions = data.questions;
-
-      // Check if quiz already completed
-      const savedResult = loadResult();
-      if (savedResult && savedResult.level) {
-        renderResultCard(savedResult.level);
-      } else {
-        const startIndex = loadProgress();
-        renderQuestion(startIndex);
-      }
-    })
-    .catch(err => {
-      container.innerHTML = '<p style="padding:40px;text-align:center;">Не удалось загрузить данные квиза.</p>';
-      console.error('Failed to load data.json:', err);
-    });
-
-  // ── Result card ────────────────────────────────────────────────
-  function renderResultCard(level) {
-    navigation.classList.add('hidden');
-    progressFill.style.width = '100%';
-    container.innerHTML = '';
-
-    const color = LEVEL_COLORS[level] || '#2481cc';
-    const name = LEVEL_NAMES[level] || 'Неизвестный';
-    const phrase = LEVEL_PHRASES[level] || '';
-    const track = LEVEL_TRACKS[level] || '';
-
-    // Card wrapper
-    const card = document.createElement('div');
-    card.style.cssText = 'display:flex;flex-direction:column;align-items:center;padding:20px 0;';
-
-    // Level badge
-    const badge = document.createElement('div');
-    badge.style.cssText = 'width:80px;height:80px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:32px;font-weight:800;color:#fff;margin-bottom:16px;background:' + color + ';';
-    badge.textContent = level;
-    card.appendChild(badge);
-
-    // Level name
-    const title = document.createElement('div');
-    title.style.cssText = 'font-size:28px;font-weight:800;margin-bottom:4px;text-align:center;';
-    title.textContent = name;
-    card.appendChild(title);
-
-    // Track
-    if (track) {
-      const trackEl = document.createElement('div');
-      trackEl.style.cssText = 'font-size:14px;color:var(--tg-theme-hint-color,#999);margin-bottom:20px;text-align:center;';
-      trackEl.textContent = 'Трек: ' + track;
-      card.appendChild(trackEl);
+  // ── Init ───────────────────────────────────────────────────────
+  fetch('data.json').then(r => r.json()).then(data => {
+    quizData = data;
+    questions = data.questions;
+    const saved = loadResult();
+    if (saved && saved.level) {
+      renderResultCard(saved.level);
+    } else {
+      const idx = loadProgress();
+      renderQuestion(idx);
     }
+  }).catch(() => {
+    container.innerHTML = '<p style="padding:40px;text-align:center;">Не удалось загрузить данные квиза.</p>';
+  });
 
-    // Phrase
-    const phraseEl = document.createElement('div');
-    phraseEl.style.cssText = 'font-size:15px;line-height:1.6;padding:16px 20px;background:var(--tg-theme-secondary-bg-color,#f4f4f5);border-radius:12px;border-left:4px solid ' + color + ';margin-bottom:24px;width:100%;';
-    phraseEl.textContent = phrase;
-    card.appendChild(phraseEl);
+  // ══════════════════════════════════════════════════════════════
+  // QUIZ QUESTIONS
+  // ══════════════════════════════════════════════════════════════
 
-    // Guide buttons
-    const buttonsWrap = document.createElement('div');
-    buttonsWrap.style.cssText = 'display:flex;flex-direction:column;gap:10px;width:100%;margin-bottom:24px;';
-
-    const guideBtn = createCardButton('\uD83E\uDDF0 Подборка инструментов', color, function () {
-      window.location.href = 'guide-' + level + '.html';
-    });
-    buttonsWrap.appendChild(guideBtn);
-
-    const stepsBtn = createCardButton('\uD83D\uDCCB Мини-гайд: шаги к следующему уровню', color, function () {
-      window.location.href = 'guide-' + level + '.html';
-    });
-    buttonsWrap.appendChild(stepsBtn);
-
-    card.appendChild(buttonsWrap);
-
-    // Safe to close message
-    const hint = document.createElement('div');
-    hint.style.cssText = 'font-size:13px;color:var(--tg-theme-hint-color,#999);text-align:center;line-height:1.5;padding:0 10px;';
-    hint.textContent = 'Можешь закрыть — всё сохранено. Открой бота в любой момент, чтобы вернуться сюда.';
-    card.appendChild(hint);
-
-    container.appendChild(card);
-  }
-
-  function createCardButton(text, color, onClick) {
-    const btn = document.createElement('button');
-    btn.style.cssText = 'display:flex;align-items:center;gap:10px;width:100%;padding:14px 18px;font-size:15px;font-weight:600;color:' + color + ';background:var(--tg-theme-secondary-bg-color,#f4f4f5);border:2px solid ' + color + '22;border-radius:12px;cursor:pointer;text-align:left;transition:transform 0.15s ease;-webkit-tap-highlight-color:transparent;';
-    btn.textContent = text;
-    btn.addEventListener('click', onClick);
-    btn.addEventListener('mousedown', function () { btn.style.transform = 'scale(0.97)'; });
-    btn.addEventListener('mouseup', function () { btn.style.transform = ''; });
-    return btn;
-  }
-
-  // ── Render a question by index ───────────────────────────────────
   function renderQuestion(index) {
     currentIndex = index;
     const q = questions[index];
-
-    // Progress bar
-    const progress = ((index + 1) / questions.length) * 100;
-    progressFill.style.width = progress + '%';
-
-    // Navigation visibility
+    progressFill.style.width = ((index + 1) / questions.length * 100) + '%';
     navigation.classList.remove('hidden');
     btnBack.disabled = (index === 0);
-
-    // Next button label
-    const isLast = (index === questions.length - 1);
-    btnNext.textContent = isLast ? 'Завершить' : 'Далее \u2192';
-
-    // Build question card
+    btnNext.textContent = (index === questions.length - 1) ? 'Далее \u2192' : 'Далее \u2192';
     container.innerHTML = '';
 
-    const numEl = document.createElement('div');
-    numEl.className = 'question-number';
-    numEl.textContent = 'Вопрос ' + (index + 1) + ' из ' + questions.length + ' \u2014 ' + q.title;
-
-    const titleEl = document.createElement('div');
-    titleEl.className = 'question-title';
-    titleEl.textContent = q.text;
-
+    const numEl = el('div', 'question-number', 'Вопрос ' + (index+1) + ' из ' + questions.length + ' \u2014 ' + q.title);
+    const titleEl = el('div', 'question-title', q.text);
     container.appendChild(numEl);
     container.appendChild(titleEl);
 
-    // Render based on type
-    if (q.type === 'single') {
-      renderSingleOptions(q);
-    } else if (q.type === 'multi') {
-      renderMultiOptions(q);
-    } else if (q.type === 'text') {
-      renderTextInput(q);
-    }
-
+    if (q.type === 'single') renderSingleOptions(q);
+    else if (q.type === 'multi') renderMultiOptions(q);
+    else if (q.type === 'text') renderTextInput(q);
     updateNextButton();
   }
 
-  // ── Single-select options ────────────────────────────────────────
   function renderSingleOptions(q) {
-    const list = document.createElement('div');
-    list.className = 'options-list';
-
+    const list = el('div', 'options-list');
     q.options.forEach(opt => {
-      const btn = createOptionButton(opt, 'radio', q);
-      if (answers[q.id] === opt.id) {
-        btn.classList.add('selected');
-      }
+      const btn = createOptionButton(opt, 'radio');
+      if (answers[q.id] === opt.id) btn.classList.add('selected');
       btn.addEventListener('click', () => {
         list.querySelectorAll('.option-btn').forEach(b => b.classList.remove('selected'));
         btn.classList.add('selected');
@@ -262,44 +110,32 @@
       });
       list.appendChild(btn);
     });
-
     container.appendChild(list);
   }
 
-  // ── Multi-select options ─────────────────────────────────────────
   function renderMultiOptions(q) {
-    const list = document.createElement('div');
-    list.className = 'options-list';
-
+    const list = el('div', 'options-list');
     q.options.forEach(opt => {
-      const btn = createOptionButton(opt, 'checkbox', q);
-      if (Array.isArray(answers[q.id]) && answers[q.id].includes(opt.id)) {
-        btn.classList.add('selected');
-      }
+      const btn = createOptionButton(opt, 'checkbox');
+      if (Array.isArray(answers[q.id]) && answers[q.id].includes(opt.id)) btn.classList.add('selected');
       btn.addEventListener('click', () => {
         btn.classList.toggle('selected');
-        const selected = [];
-        list.querySelectorAll('.option-btn.selected').forEach(b => {
-          selected.push(b.dataset.optionId);
-        });
-        answers[q.id] = selected;
+        const sel = [];
+        list.querySelectorAll('.option-btn.selected').forEach(b => sel.push(b.dataset.optionId));
+        answers[q.id] = sel;
         saveProgress();
         updateNextButton();
       });
       list.appendChild(btn);
     });
-
     container.appendChild(list);
   }
 
-  // ── Text input ───────────────────────────────────────────────────
   function renderTextInput(q) {
     const textarea = document.createElement('textarea');
     textarea.className = 'text-input';
     textarea.placeholder = q.placeholder || '';
-    if (answers[q.id]) {
-      textarea.value = answers[q.id];
-    }
+    if (answers[q.id]) textarea.value = answers[q.id];
     textarea.addEventListener('input', () => {
       answers[q.id] = textarea.value.trim();
       saveProgress();
@@ -308,161 +144,343 @@
     container.appendChild(textarea);
   }
 
-  // ── Create an option button element ──────────────────────────────
-  function createOptionButton(opt, indicatorType, q) {
-    const btn = document.createElement('button');
-    btn.className = 'option-btn';
+  function createOptionButton(opt, type) {
+    const btn = el('button', 'option-btn');
     btn.dataset.optionId = opt.id;
-
-    const indicator = document.createElement('span');
-    indicator.className = 'option-indicator ' + indicatorType;
-    const check = document.createElement('span');
-    check.className = 'option-indicator-check';
-    indicator.appendChild(check);
-
-    const textWrap = document.createElement('span');
-    textWrap.className = 'option-text';
-    textWrap.textContent = opt.text;
-
+    const indicator = el('span', 'option-indicator ' + type);
+    indicator.appendChild(el('span', 'option-indicator-check'));
+    const textWrap = el('span', 'option-text', opt.text);
     if (opt.description) {
-      const desc = document.createElement('span');
-      desc.className = 'option-description';
-      desc.textContent = opt.description;
+      const desc = el('span', 'option-description', opt.description);
       textWrap.appendChild(desc);
     }
-
     btn.appendChild(indicator);
     btn.appendChild(textWrap);
     return btn;
   }
 
-  // ── Navigation logic ─────────────────────────────────────────────
+  // ── Navigation ─────────────────────────────────────────────────
   btnNext.addEventListener('click', () => {
     if (btnNext.disabled) return;
-
-    const isLast = (currentIndex === questions.length - 1);
-    if (isLast) {
-      finishQuiz();
+    if (currentIndex === questions.length - 1) {
+      // Last question → go to CTA
+      transitionTo(() => renderCtaOffer());
     } else {
-      transitionTo(() => {
-        renderQuestion(currentIndex + 1);
-        saveProgress();
-      });
+      transitionTo(() => { renderQuestion(currentIndex + 1); saveProgress(); });
     }
   });
 
   btnBack.addEventListener('click', () => {
-    if (btnBack.disabled) return;
-
-    if (currentIndex === 0) {
-      return;
-    } else {
-      transitionTo(() => renderQuestion(currentIndex - 1));
-    }
+    if (btnBack.disabled || currentIndex === 0) return;
+    transitionTo(() => renderQuestion(currentIndex - 1));
   });
 
-  // ── Enable/disable "Далее" based on current answer ──────────────
   function updateNextButton() {
-    if (currentIndex < 0) {
-      btnNext.disabled = true;
-      return;
-    }
+    if (currentIndex < 0) { btnNext.disabled = true; return; }
     const q = questions[currentIndex];
-    if (q.type === 'single') {
-      btnNext.disabled = !answers[q.id];
-    } else if (q.type === 'multi') {
-      btnNext.disabled = !Array.isArray(answers[q.id]) || answers[q.id].length === 0;
-    } else if (q.type === 'text') {
-      btnNext.disabled = !answers[q.id] || answers[q.id].length === 0;
-    }
+    if (q.type === 'single') btnNext.disabled = !answers[q.id];
+    else if (q.type === 'multi') btnNext.disabled = !Array.isArray(answers[q.id]) || !answers[q.id].length;
+    else if (q.type === 'text') btnNext.disabled = !answers[q.id] || !answers[q.id].length;
   }
 
-  // ── Smooth transition between screens ────────────────────────────
-  function transitionTo(renderFn) {
-    container.classList.add('fade-out');
-    setTimeout(() => {
-      renderFn();
-      container.classList.remove('fade-out');
-    }, 200);
-  }
+  // ══════════════════════════════════════════════════════════════
+  // CTA SCREENS (inside WebApp)
+  // ══════════════════════════════════════════════════════════════
 
-  // ── Scoring ──────────────────────────────────────────────────────
-  function calculateScore() {
-    const scoredQuestions = ['q1', 'q2', 'q3', 'q4', 'q5', 'q7', 'q8'];
-    let totalScore = 0;
-
-    scoredQuestions.forEach(qId => {
-      const q = questions.find(qq => qq.id === qId);
-      const answer = answers[qId];
-
-      if (!q || answer === undefined || answer === null) return;
-
-      if (q.type === 'single') {
-        const opt = q.options.find(o => o.id === answer);
-        if (opt) totalScore += opt.score;
-      } else if (q.type === 'multi' && q.scoring === 'special') {
-        totalScore += scoreQ3(answer, q);
-      } else if (q.type === 'multi' && q.scoring === 'max') {
-        totalScore += scoreQ4(answer, q);
-      }
-    });
-
-    const avg = totalScore / scoredQuestions.length;
-    const level = Math.round(avg);
-
-    return {
-      rawScore: totalScore,
-      average: Math.round(avg * 100) / 100,
-      level: Math.max(1, Math.min(5, level))
-    };
-  }
-
-  function scoreQ3(selected, q) {
-    if (!Array.isArray(selected) || selected.length === 0) return 1;
-    let score = 0;
-    if (selected.includes('g')) score = Math.max(score, 4);
-    const midCount = selected.filter(s => ['c', 'd', 'e', 'f'].includes(s)).length;
-    if (midCount > 0) score = Math.max(score, midCount >= 3 ? 3 : 2);
-    return score || 1;
-  }
-
-  function scoreQ4(selected, q) {
-    if (!Array.isArray(selected) || selected.length === 0) return 1;
-    let maxScore = 0;
-    selected.forEach(optId => {
-      const opt = q.options.find(o => o.id === optId);
-      if (opt && opt.score > maxScore) maxScore = opt.score;
-    });
-    return maxScore || 1;
-  }
-
-  // ── Finish quiz and send data ────────────────────────────────────
-  function finishQuiz() {
+  function getTrackKey() {
     const scoring = calculateScore();
+    if (scoring.level === 5) return 'architect';
+    return scoring.level <= 2 ? 'tools' : 'create';
+  }
 
+  function renderCtaOffer() {
+    navigation.classList.add('hidden');
+    progressFill.style.width = '100%';
+    container.innerHTML = '';
+
+    const track = getTrackKey();
+    const cta = quizData.cta[track];
+
+    const screen = el('div', 'cta-screen');
+    screen.style.cssText = 'padding:20px 0;';
+
+    const icon = el('div', '', '💡');
+    icon.style.cssText = 'font-size:40px;text-align:center;margin-bottom:16px;';
+    screen.appendChild(icon);
+
+    const text = el('div', '', '');
+    text.style.cssText = 'font-size:16px;line-height:1.6;white-space:pre-line;margin-bottom:24px;';
+    text.textContent = cta.text;
+    screen.appendChild(text);
+
+    if (track === 'architect') {
+      // Architect: simple yes/no
+      const yesBtn = makeBtn('Да, держите в курсе', 'var(--tg-theme-button-color,#2481cc)', () => {
+        ctaResponse.cta_reaction = 'architect_yes';
+        transitionTo(() => renderCtaContact());
+      });
+      const noBtn = makeBtn('Нет, спасибо', 'var(--tg-theme-secondary-bg-color,#f4f4f5)', () => {
+        ctaResponse.cta_reaction = 'architect_no';
+        finishAll();
+      });
+      noBtn.style.color = 'var(--tg-theme-text-color,#1a1a1a)';
+      screen.appendChild(yesBtn);
+      screen.appendChild(noBtn);
+    } else {
+      // Show price screen
+      const btn = makeBtn('Расскажите подробнее', 'var(--tg-theme-button-color,#2481cc)', () => {
+        ctaResponse.cta_reaction = 'details';
+        transitionTo(() => renderCtaPrice());
+      });
+      screen.appendChild(btn);
+    }
+
+    container.appendChild(screen);
+  }
+
+  function renderCtaPrice() {
+    navigation.classList.add('hidden');
+    container.innerHTML = '';
+
+    const screen = el('div', 'cta-screen');
+    screen.style.cssText = 'padding:20px 0;';
+
+    const priceText = el('div', '', '');
+    priceText.style.cssText = 'font-size:16px;line-height:1.6;white-space:pre-line;margin-bottom:20px;';
+    priceText.textContent = quizData.cta.price_text;
+    screen.appendChild(priceText);
+
+    const subtitle = el('div', '', 'Как тебе?');
+    subtitle.style.cssText = 'font-size:18px;font-weight:700;margin-bottom:16px;';
+    screen.appendChild(subtitle);
+
+    const options = el('div', '');
+    options.style.cssText = 'display:flex;flex-direction:column;gap:10px;';
+
+    quizData.cta.price_options.forEach(opt => {
+      const btn = el('button', 'option-btn');
+      btn.style.cssText = 'display:flex;align-items:center;gap:12px;width:100%;padding:14px 16px;font-size:15px;line-height:1.4;text-align:left;color:var(--tg-theme-text-color,#1a1a1a);background:var(--tg-theme-secondary-bg-color,#f4f4f5);border:2px solid transparent;border-radius:12px;cursor:pointer;';
+      btn.textContent = opt.emoji + '  ' + opt.short;
+      btn.addEventListener('click', () => {
+        ctaResponse.price_reaction = opt.full;
+        ctaResponse.price_id = opt.id;
+        if (opt.id === 'no') {
+          finishAll();
+        } else if (opt.id === 'custom') {
+          transitionTo(() => renderCtaCustom());
+        } else {
+          transitionTo(() => renderCtaContact());
+        }
+      });
+      options.appendChild(btn);
+    });
+
+    screen.appendChild(options);
+    container.appendChild(screen);
+  }
+
+  function renderCtaCustom() {
+    navigation.classList.add('hidden');
+    container.innerHTML = '';
+
+    const screen = el('div', 'cta-screen');
+    screen.style.cssText = 'padding:20px 0;';
+
+    const title = el('div', '', 'Напиши свой ответ — нам интересно! 👇');
+    title.style.cssText = 'font-size:18px;font-weight:700;margin-bottom:16px;';
+    screen.appendChild(title);
+
+    const textarea = document.createElement('textarea');
+    textarea.className = 'text-input';
+    textarea.placeholder = 'Твой комментарий...';
+    textarea.style.marginBottom = '16px';
+    screen.appendChild(textarea);
+
+    const btn = makeBtn('Отправить', 'var(--tg-theme-button-color,#2481cc)', () => {
+      ctaResponse.price_comment = textarea.value.trim();
+      transitionTo(() => renderCtaContact());
+    });
+    btn.id = 'cta-send-btn';
+    screen.appendChild(btn);
+
+    container.appendChild(screen);
+  }
+
+  function renderCtaContact() {
+    navigation.classList.add('hidden');
+    container.innerHTML = '';
+
+    const screen = el('div', 'cta-screen');
+    screen.style.cssText = 'padding:20px 0;';
+
+    const title = el('div', '', quizData.cta.contact_text);
+    title.style.cssText = 'font-size:16px;line-height:1.6;margin-bottom:16px;';
+    screen.appendChild(title);
+
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.className = 'text-input';
+    input.placeholder = 'Email или телефон';
+    input.style.cssText += ';min-height:auto;padding:14px 16px;margin-bottom:16px;';
+    screen.appendChild(input);
+
+    const btnSend = makeBtn('\uD83D\uDCE7 Отправить контакт', 'var(--tg-theme-button-color,#2481cc)', () => {
+      ctaResponse.contact_info = input.value.trim();
+      finishAll();
+    });
+    screen.appendChild(btnSend);
+
+    const btnSkip = makeBtn('Пропустить', 'var(--tg-theme-secondary-bg-color,#f4f4f5)', () => {
+      ctaResponse.contact_info = '';
+      finishAll();
+    });
+    btnSkip.style.color = 'var(--tg-theme-text-color,#1a1a1a)';
+    btnSkip.style.marginTop = '8px';
+    screen.appendChild(btnSkip);
+
+    container.appendChild(screen);
+  }
+
+  // ══════════════════════════════════════════════════════════════
+  // RESULT CARD
+  // ══════════════════════════════════════════════════════════════
+
+  function renderResultCard(level) {
+    navigation.classList.add('hidden');
+    progressFill.style.width = '100%';
+    container.innerHTML = '';
+
+    const color = LEVEL_COLORS[level] || '#2481cc';
+    const name = LEVEL_NAMES[level] || '';
+    const phrase = LEVEL_PHRASES[level] || '';
+    const track = LEVEL_TRACKS[level] || '';
+
+    const card = el('div', '');
+    card.style.cssText = 'display:flex;flex-direction:column;align-items:center;padding:20px 0;';
+
+    // Badge
+    const badge = el('div', '', level);
+    badge.style.cssText = 'width:80px;height:80px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:32px;font-weight:800;color:#fff;margin-bottom:16px;background:' + color;
+    card.appendChild(badge);
+
+    // Title
+    card.appendChild(el('div', '', name, 'font-size:28px;font-weight:800;margin-bottom:4px;text-align:center;'));
+
+    // Track
+    if (track) card.appendChild(el('div', '', 'Трек: ' + track, 'font-size:14px;color:var(--tg-theme-hint-color,#999);margin-bottom:20px;text-align:center;'));
+
+    // Phrase
+    const phraseEl = el('div', '', phrase);
+    phraseEl.style.cssText = 'font-size:15px;line-height:1.6;padding:16px 20px;background:var(--tg-theme-secondary-bg-color,#f4f4f5);border-radius:12px;border-left:4px solid ' + color + ';margin-bottom:24px;width:100%;';
+    card.appendChild(phraseEl);
+
+    // Guide buttons
+    const wrap = el('div', '', '', 'display:flex;flex-direction:column;gap:10px;width:100%;margin-bottom:24px;');
+    wrap.appendChild(makeCardBtn('\uD83E\uDDF0 Подборка инструментов', color, () => { window.location.href = 'guide-' + level + '.html'; }));
+    wrap.appendChild(makeCardBtn('\uD83D\uDCCB Мини-гайд: шаги к следующему уровню', color, () => { window.location.href = 'guide-' + level + '.html'; }));
+    card.appendChild(wrap);
+
+    // Hint
+    card.appendChild(el('div', '', 'Можешь закрыть — всё сохранено. Открой бота в любой момент, чтобы вернуться сюда.', 'font-size:13px;color:var(--tg-theme-hint-color,#999);text-align:center;line-height:1.5;padding:0 10px;'));
+
+    container.appendChild(card);
+  }
+
+  function makeCardBtn(text, color, onClick) {
+    const btn = el('button', '', text);
+    btn.style.cssText = 'display:flex;align-items:center;gap:10px;width:100%;padding:14px 18px;font-size:15px;font-weight:600;color:' + color + ';background:var(--tg-theme-secondary-bg-color,#f4f4f5);border:2px solid ' + color + '22;border-radius:12px;cursor:pointer;text-align:left;';
+    btn.addEventListener('click', onClick);
+    return btn;
+  }
+
+  // ══════════════════════════════════════════════════════════════
+  // SCORING
+  // ══════════════════════════════════════════════════════════════
+
+  function calculateScore() {
+    const scored = ['q1','q2','q3','q4','q5','q7','q8'];
+    let total = 0;
+    scored.forEach(qId => {
+      const q = questions.find(qq => qq.id === qId);
+      const a = answers[qId];
+      if (!q || a == null) return;
+      if (q.type === 'single') { const o = q.options.find(o => o.id === a); if (o) total += o.score; }
+      else if (q.scoring === 'special') total += scoreQ3(a);
+      else if (q.scoring === 'max') total += scoreQ4(a, q);
+    });
+    const avg = total / scored.length;
+    return { average: Math.round(avg * 100) / 100, level: Math.max(1, Math.min(5, Math.round(avg))) };
+  }
+
+  function scoreQ3(sel) {
+    if (!Array.isArray(sel) || !sel.length) return 1;
+    let s = 0;
+    if (sel.includes('g')) s = 4;
+    const mid = sel.filter(x => 'cdef'.includes(x)).length;
+    if (mid) s = Math.max(s, mid >= 3 ? 3 : 2);
+    return s || 1;
+  }
+
+  function scoreQ4(sel, q) {
+    if (!Array.isArray(sel) || !sel.length) return 1;
+    let m = 0;
+    sel.forEach(id => { const o = q.options.find(o => o.id === id); if (o && o.score > m) m = o.score; });
+    return m || 1;
+  }
+
+  // ══════════════════════════════════════════════════════════════
+  // FINISH — send all data to bot
+  // ══════════════════════════════════════════════════════════════
+
+  function finishAll() {
+    const scoring = calculateScore();
     const q9 = answers['q9'] || '';
-    const q9_segment = (q9 === 'a' || q9 === 'b') ? 'tools' : 'create';
-    const q9_approach = q9 === 'c' ? 'product' : (q9 === 'd' ? 'system' : '');
 
     const payload = {
       answers: answers,
       score: scoring.average,
       level: scoring.level,
-      q9_segment: q9_segment,
-      q9_approach: q9_approach
+      q9_segment: (q9 === 'a' || q9 === 'b') ? 'tools' : 'create',
+      q9_approach: q9 === 'c' ? 'product' : (q9 === 'd' ? 'system' : ''),
+      cta_response: ctaResponse.cta_reaction || 'details',
+      price_reaction: ctaResponse.price_reaction || '',
+      price_comment: ctaResponse.price_comment || '',
+      contact_info: ctaResponse.contact_info || ''
     };
 
-    // Save result for future reopens
     clearProgress();
     saveResult(scoring.level, scoring.average);
 
-    // Send data to Telegram bot
     if (tg) {
       tg.sendData(JSON.stringify(payload));
     } else {
-      console.log('Quiz results:', JSON.stringify(payload, null, 2));
+      console.log('All data:', JSON.stringify(payload, null, 2));
       transitionTo(() => renderResultCard(scoring.level));
     }
+  }
+
+  // ══════════════════════════════════════════════════════════════
+  // HELPERS
+  // ══════════════════════════════════════════════════════════════
+
+  function el(tag, cls, text, style) {
+    const e = document.createElement(tag);
+    if (cls) e.className = cls;
+    if (text) e.textContent = text;
+    if (style) e.style.cssText = style;
+    return e;
+  }
+
+  function makeBtn(text, bg, onClick) {
+    const btn = el('button', '', text);
+    btn.style.cssText = 'display:block;width:100%;padding:14px 20px;font-size:16px;font-weight:600;color:#fff;background:' + bg + ';border:none;border-radius:12px;cursor:pointer;margin-top:8px;';
+    btn.addEventListener('click', onClick);
+    return btn;
+  }
+
+  function transitionTo(fn) {
+    container.classList.add('fade-out');
+    setTimeout(() => { fn(); container.classList.remove('fade-out'); }, 200);
   }
 
 })();
