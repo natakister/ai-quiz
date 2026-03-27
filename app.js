@@ -1,8 +1,10 @@
 /**
  * AI Level Quiz — Telegram Web App
  *
- * Loads quiz data from data.json, renders questions with smooth transitions,
- * calculates the AI interaction level, and sends results back to the bot.
+ * Three states:
+ * 1. Quiz in progress → questions with saved progress
+ * 2. Quiz complete → result card with level + guide links
+ * 3. Reopened after completion → result card (no re-take)
  */
 
 (function () {
@@ -23,17 +25,51 @@
   const btnNext = document.getElementById('btn-next');
 
   // ── State ────────────────────────────────────────────────────────
-  let quizData = null;       // parsed data.json
-  let questions = [];        // quizData.questions
-  let currentIndex = -1;     // -1 = consent screen, 0..N = questions
-  const answers = {};        // { q1: "b", q3: ["a","c"], q6: "free text", ... }
+  let quizData = null;
+  let questions = [];
+  let currentIndex = -1;
+  const answers = {};
 
-  // ── Progress persistence ───────────────────────────────────────
-  const STORAGE_KEY = 'ai_quiz_progress';
+  // ── Level data ─────────────────────────────────────────────────
+  const LEVEL_NAMES = {
+    1: 'Наблюдатель',
+    2: 'Собеседник',
+    3: 'Дирижёр',
+    4: 'Изобретатель',
+    5: 'Архитектор'
+  };
+
+  const LEVEL_COLORS = {
+    1: '#4CAF50',
+    2: '#2196F3',
+    3: '#9C27B0',
+    4: '#FF9800',
+    5: '#F44336'
+  };
+
+  const LEVEL_PHRASES = {
+    1: 'Ты пока наблюдаешь со стороны — и это нормально. Но пока ты наблюдаешь, AI уже пишет письма, анализирует документы и планирует отпуск за твоих коллег.',
+    2: 'Вы с AI на «вы» — вежливо общаетесь, но пока не доверяете ему серьёзные дела. А зря — он умеет гораздо больше, чем переписывать письма.',
+    3: 'Ты уже дирижируешь — AI делает то, что ты говоришь. Но представь: он мог бы делать это сам, без дирижёрской палочки. Знать твои задачи, контекст и правила — и действовать.',
+    4: 'Ты уже изобретаешь — строишь, пробуешь, экспериментируешь. Но пока каждое изобретение живёт отдельно. Что если собрать из них систему, которая работает как единый организм?',
+    5: 'Ты уже архитектор — у тебя есть своя система, и ты знаешь, как она устроена. Мы тебя не будем учить — но, кажется, нам есть о чём поговорить.'
+  };
+
+  const LEVEL_TRACKS = {
+    1: '«Набор AI-инструментов»',
+    2: '«Набор AI-инструментов»',
+    3: '«Создавай с AI»',
+    4: '«Создавай с AI»',
+    5: ''
+  };
+
+  // ── Persistence ────────────────────────────────────────────────
+  const PROGRESS_KEY = 'ai_quiz_progress';
+  const RESULT_KEY = 'ai_quiz_result';
 
   function saveProgress() {
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify({
+      localStorage.setItem(PROGRESS_KEY, JSON.stringify({
         answers: answers,
         index: currentIndex
       }));
@@ -42,7 +78,7 @@
 
   function loadProgress() {
     try {
-      const saved = JSON.parse(localStorage.getItem(STORAGE_KEY));
+      const saved = JSON.parse(localStorage.getItem(PROGRESS_KEY));
       if (saved && saved.answers) {
         Object.assign(answers, saved.answers);
         return saved.index || 0;
@@ -52,7 +88,19 @@
   }
 
   function clearProgress() {
-    try { localStorage.removeItem(STORAGE_KEY); } catch (e) { /* silent */ }
+    try { localStorage.removeItem(PROGRESS_KEY); } catch (e) { /* silent */ }
+  }
+
+  function saveResult(level, score) {
+    try {
+      localStorage.setItem(RESULT_KEY, JSON.stringify({ level: level, score: score }));
+    } catch (e) { /* silent */ }
+  }
+
+  function loadResult() {
+    try {
+      return JSON.parse(localStorage.getItem(RESULT_KEY));
+    } catch (e) { return null; }
   }
 
   // ── Init ─────────────────────────────────────────────────────────
@@ -61,43 +109,95 @@
     .then(data => {
       quizData = data;
       questions = data.questions;
-      const startIndex = loadProgress();
-      renderQuestion(startIndex);
+
+      // Check if quiz already completed
+      const savedResult = loadResult();
+      if (savedResult && savedResult.level) {
+        renderResultCard(savedResult.level);
+      } else {
+        const startIndex = loadProgress();
+        renderQuestion(startIndex);
+      }
     })
     .catch(err => {
       container.innerHTML = '<p style="padding:40px;text-align:center;">Не удалось загрузить данные квиза.</p>';
       console.error('Failed to load data.json:', err);
     });
 
-  // ── Consent screen ───────────────────────────────────────────────
-  function renderConsent() {
-    currentIndex = -1;
-    progressFill.style.width = '0%';
+  // ── Result card ────────────────────────────────────────────────
+  function renderResultCard(level) {
     navigation.classList.add('hidden');
-
+    progressFill.style.width = '100%';
     container.innerHTML = '';
-    const screen = document.createElement('div');
-    screen.className = 'consent-screen';
 
-    const icon = document.createElement('div');
-    icon.className = 'consent-icon';
-    icon.textContent = '\u{1F916}';
+    const color = LEVEL_COLORS[level] || '#2481cc';
+    const name = LEVEL_NAMES[level] || 'Неизвестный';
+    const phrase = LEVEL_PHRASES[level] || '';
+    const track = LEVEL_TRACKS[level] || '';
 
-    const text = document.createElement('div');
-    text.className = 'consent-text';
-    text.textContent = quizData.consent.text;
+    // Card wrapper
+    const card = document.createElement('div');
+    card.style.cssText = 'display:flex;flex-direction:column;align-items:center;padding:20px 0;';
 
-    const btn = document.createElement('button');
-    btn.className = 'consent-button';
-    btn.textContent = quizData.consent.button;
-    btn.addEventListener('click', () => {
-      transitionTo(() => renderQuestion(0));
+    // Level badge
+    const badge = document.createElement('div');
+    badge.style.cssText = 'width:80px;height:80px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:32px;font-weight:800;color:#fff;margin-bottom:16px;background:' + color + ';';
+    badge.textContent = level;
+    card.appendChild(badge);
+
+    // Level name
+    const title = document.createElement('div');
+    title.style.cssText = 'font-size:28px;font-weight:800;margin-bottom:4px;text-align:center;';
+    title.textContent = name;
+    card.appendChild(title);
+
+    // Track
+    if (track) {
+      const trackEl = document.createElement('div');
+      trackEl.style.cssText = 'font-size:14px;color:var(--tg-theme-hint-color,#999);margin-bottom:20px;text-align:center;';
+      trackEl.textContent = 'Трек: ' + track;
+      card.appendChild(trackEl);
+    }
+
+    // Phrase
+    const phraseEl = document.createElement('div');
+    phraseEl.style.cssText = 'font-size:15px;line-height:1.6;padding:16px 20px;background:var(--tg-theme-secondary-bg-color,#f4f4f5);border-radius:12px;border-left:4px solid ' + color + ';margin-bottom:24px;width:100%;';
+    phraseEl.textContent = phrase;
+    card.appendChild(phraseEl);
+
+    // Guide buttons
+    const buttonsWrap = document.createElement('div');
+    buttonsWrap.style.cssText = 'display:flex;flex-direction:column;gap:10px;width:100%;margin-bottom:24px;';
+
+    const guideBtn = createCardButton('\uD83E\uDDF0 Подборка инструментов', color, function () {
+      window.location.href = 'guide-' + level + '.html';
     });
+    buttonsWrap.appendChild(guideBtn);
 
-    screen.appendChild(icon);
-    screen.appendChild(text);
-    screen.appendChild(btn);
-    container.appendChild(screen);
+    const stepsBtn = createCardButton('\uD83D\uDCCB Мини-гайд: шаги к следующему уровню', color, function () {
+      window.location.href = 'guide-' + level + '.html';
+    });
+    buttonsWrap.appendChild(stepsBtn);
+
+    card.appendChild(buttonsWrap);
+
+    // Safe to close message
+    const hint = document.createElement('div');
+    hint.style.cssText = 'font-size:13px;color:var(--tg-theme-hint-color,#999);text-align:center;line-height:1.5;padding:0 10px;';
+    hint.textContent = 'Можешь закрыть — всё сохранено. Открой бота в любой момент, чтобы вернуться сюда.';
+    card.appendChild(hint);
+
+    container.appendChild(card);
+  }
+
+  function createCardButton(text, color, onClick) {
+    const btn = document.createElement('button');
+    btn.style.cssText = 'display:flex;align-items:center;gap:10px;width:100%;padding:14px 18px;font-size:15px;font-weight:600;color:' + color + ';background:var(--tg-theme-secondary-bg-color,#f4f4f5);border:2px solid ' + color + '22;border-radius:12px;cursor:pointer;text-align:left;transition:transform 0.15s ease;-webkit-tap-highlight-color:transparent;';
+    btn.textContent = text;
+    btn.addEventListener('click', onClick);
+    btn.addEventListener('mousedown', function () { btn.style.transform = 'scale(0.97)'; });
+    btn.addEventListener('mouseup', function () { btn.style.transform = ''; });
+    return btn;
   }
 
   // ── Render a question by index ───────────────────────────────────
@@ -150,12 +250,10 @@
 
     q.options.forEach(opt => {
       const btn = createOptionButton(opt, 'radio', q);
-      // Restore previous answer
       if (answers[q.id] === opt.id) {
         btn.classList.add('selected');
       }
       btn.addEventListener('click', () => {
-        // Deselect all
         list.querySelectorAll('.option-btn').forEach(b => b.classList.remove('selected'));
         btn.classList.add('selected');
         answers[q.id] = opt.id;
@@ -175,13 +273,11 @@
 
     q.options.forEach(opt => {
       const btn = createOptionButton(opt, 'checkbox', q);
-      // Restore previous answer
       if (Array.isArray(answers[q.id]) && answers[q.id].includes(opt.id)) {
         btn.classList.add('selected');
       }
       btn.addEventListener('click', () => {
         btn.classList.toggle('selected');
-        // Collect selected
         const selected = [];
         list.querySelectorAll('.option-btn.selected').forEach(b => {
           selected.push(b.dataset.optionId);
@@ -201,7 +297,6 @@
     const textarea = document.createElement('textarea');
     textarea.className = 'text-input';
     textarea.placeholder = q.placeholder || '';
-    // Restore previous answer
     if (answers[q.id]) {
       textarea.value = answers[q.id];
     }
@@ -229,7 +324,6 @@
     textWrap.className = 'option-text';
     textWrap.textContent = opt.text;
 
-    // Add description if present (Q9)
     if (opt.description) {
       const desc = document.createElement('span');
       desc.className = 'option-description';
@@ -248,7 +342,6 @@
 
     const isLast = (currentIndex === questions.length - 1);
     if (isLast) {
-      clearProgress();
       finishQuiz();
     } else {
       transitionTo(() => {
@@ -262,7 +355,6 @@
     if (btnBack.disabled) return;
 
     if (currentIndex === 0) {
-      // Already at first question, can't go back further
       return;
     } else {
       transitionTo(() => renderQuestion(currentIndex - 1));
@@ -296,11 +388,6 @@
 
   // ── Scoring ──────────────────────────────────────────────────────
   function calculateScore() {
-    // Questions that contribute to the score (7 scored questions)
-    // Q1 (single), Q2 (single), Q3 (multi-special), Q4 (multi-max),
-    // Q5 (single), Q7 (single), Q8 (single)
-    // Q6 = text (no score), Q9 = segment (no score)
-
     const scoredQuestions = ['q1', 'q2', 'q3', 'q4', 'q5', 'q7', 'q8'];
     let totalScore = 0;
 
@@ -308,28 +395,18 @@
       const q = questions.find(qq => qq.id === qId);
       const answer = answers[qId];
 
-      if (!q || answer === undefined || answer === null) {
-        return;
-      }
+      if (!q || answer === undefined || answer === null) return;
 
       if (q.type === 'single') {
-        // Direct score from selected option
         const opt = q.options.find(o => o.id === answer);
         if (opt) totalScore += opt.score;
-
       } else if (q.type === 'multi' && q.scoring === 'special') {
-        // Q3: special multi-select scoring
-        // Logic: score based on the mix of selected options
-        // (a)=1, (b)=1 are basic; (c)(d)(e)(f) are mid-level; (g) is advanced
         totalScore += scoreQ3(answer, q);
-
       } else if (q.type === 'multi' && q.scoring === 'max') {
-        // Q4: max of selected scores
         totalScore += scoreQ4(answer, q);
       }
     });
 
-    // Average of 7 scored questions
     const avg = totalScore / scoredQuestions.length;
     const level = Math.round(avg);
 
@@ -340,54 +417,22 @@
     };
   }
 
-  /**
-   * Q3 scoring: multi-select with special logic.
-   * - If only (a) and/or (b) selected: score = 1
-   * - If any of (c)(d)(e)(f) selected: base 2, +1 if 3+ of these selected (up to 3)
-   * - If (g) selected: score = 4
-   * - Result = max of applicable scores
-   */
   function scoreQ3(selected, q) {
     if (!Array.isArray(selected) || selected.length === 0) return 1;
-
     let score = 0;
-
-    // Check for code/automation (highest)
-    if (selected.includes('g')) {
-      score = Math.max(score, 4);
-    }
-
-    // Check mid-level options (c, d, e, f)
-    const midOptions = ['c', 'd', 'e', 'f'];
-    const midCount = selected.filter(s => midOptions.includes(s)).length;
-    if (midCount > 0) {
-      // 1 mid-option = 2, 2 = 2, 3+ = 3
-      const midScore = midCount >= 3 ? 3 : 2;
-      score = Math.max(score, midScore);
-    }
-
-    // Only basic options
-    if (score === 0) {
-      score = 1;
-    }
-
-    return score;
+    if (selected.includes('g')) score = Math.max(score, 4);
+    const midCount = selected.filter(s => ['c', 'd', 'e', 'f'].includes(s)).length;
+    if (midCount > 0) score = Math.max(score, midCount >= 3 ? 3 : 2);
+    return score || 1;
   }
 
-  /**
-   * Q4 scoring: max of selected option scores.
-   */
   function scoreQ4(selected, q) {
     if (!Array.isArray(selected) || selected.length === 0) return 1;
-
     let maxScore = 0;
     selected.forEach(optId => {
       const opt = q.options.find(o => o.id === optId);
-      if (opt && opt.score > maxScore) {
-        maxScore = opt.score;
-      }
+      if (opt && opt.score > maxScore) maxScore = opt.score;
     });
-
     return maxScore || 1;
   }
 
@@ -395,8 +440,6 @@
   function finishQuiz() {
     const scoring = calculateScore();
 
-    // Q9 segmentation: a/b → tools track, c/d → create track
-    // c = product approach, d = system approach
     const q9 = answers['q9'] || '';
     const q9_segment = (q9 === 'a' || q9 === 'b') ? 'tools' : 'create';
     const q9_approach = q9 === 'c' ? 'product' : (q9 === 'd' ? 'system' : '');
@@ -409,49 +452,17 @@
       q9_approach: q9_approach
     };
 
+    // Save result for future reopens
+    clearProgress();
+    saveResult(scoring.level, scoring.average);
+
     // Send data to Telegram bot
     if (tg) {
       tg.sendData(JSON.stringify(payload));
-      // sendData automatically closes the Web App
     } else {
-      // Fallback for testing outside Telegram
       console.log('Quiz results:', JSON.stringify(payload, null, 2));
-      showTestResults(payload);
+      transitionTo(() => renderResultCard(scoring.level));
     }
-  }
-
-  // ── Test mode: show results in the page ──────────────────────────
-  function showTestResults(payload) {
-    const levelNames = {
-      1: 'Наблюдатель',
-      2: 'Собеседник',
-      3: 'Дирижёр',
-      4: 'Изобретатель',
-      5: 'Архитектор'
-    };
-
-    navigation.classList.add('hidden');
-    progressFill.style.width = '100%';
-    container.innerHTML = '';
-
-    const screen = document.createElement('div');
-    screen.className = 'consent-screen';
-
-    const title = document.createElement('div');
-    title.className = 'question-title';
-    title.style.textAlign = 'center';
-    title.textContent = 'Твой уровень: ' + levelNames[payload.level];
-
-    const details = document.createElement('div');
-    details.className = 'consent-text';
-    details.textContent = 'Средний балл: ' + payload.score + '\n'
-      + 'Уровень: ' + payload.level + ' (' + levelNames[payload.level] + ')\n'
-      + 'Направление: ' + payload.q9_segment + '\n\n'
-      + 'В Telegram результат был бы отправлен боту автоматически.';
-
-    screen.appendChild(title);
-    screen.appendChild(details);
-    container.appendChild(screen);
   }
 
 })();
