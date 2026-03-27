@@ -41,7 +41,7 @@
 
   // ── Persistence ────────────────────────────────────────────────
   // Bump QUIZ_VERSION to force-clear all user data (for testing / content updates)
-  const QUIZ_VERSION = '5';
+  const QUIZ_VERSION = '6';
   const VERSION_KEY = 'ai_quiz_version';
   const PROGRESS_KEY = 'ai_quiz_progress';
   const RESULT_KEY = 'ai_quiz_result';
@@ -276,6 +276,11 @@
     const trackData = quizData.cta[track];
     const screen = el('div', '');
     screen.style.cssText = 'padding:20px 0;';
+
+    // Top label
+    const label = el('div', '', 'Интенсив, который мы готовим');
+    label.style.cssText = 'font-size:13px;font-weight:600;color:var(--tg-theme-hint-color,#999);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;';
+    screen.appendChild(label);
 
     // Intensive name
     const nameEl = el('div', '', trackData.name);
