@@ -127,11 +127,23 @@
 
   function renderMultiOptions(q) {
     const list = el('div', 'options-list');
+    // Find "none" option (e.g. Q4 option "g" = "Ничего из перечисленного")
+    const noneId = (q.options.find(o => o.score === 1 && o.id === 'g') || {}).id;
+
     q.options.forEach(opt => {
       const btn = createOptionButton(opt, 'checkbox');
       if (Array.isArray(answers[q.id]) && answers[q.id].includes(opt.id)) btn.classList.add('selected');
       btn.addEventListener('click', () => {
-        btn.classList.toggle('selected');
+        if (opt.id === noneId) {
+          // "Ничего" clicked → deselect all others
+          list.querySelectorAll('.option-btn').forEach(b => b.classList.remove('selected'));
+          btn.classList.add('selected');
+        } else {
+          // Regular option → deselect "ничего"
+          const noneBtn = list.querySelector('[data-option-id="' + noneId + '"]');
+          if (noneBtn) noneBtn.classList.remove('selected');
+          btn.classList.toggle('selected');
+        }
         const sel = [];
         list.querySelectorAll('.option-btn.selected').forEach(b => sel.push(b.dataset.optionId));
         answers[q.id] = sel;
