@@ -336,7 +336,7 @@
         } else if (opt.id === 'custom') {
           transitionTo(() => renderCtaCustom());
         } else {
-          transitionTo(() => renderCtaContact());
+          finishAll();
         }
       });
       options.appendChild(btn);
@@ -365,7 +365,7 @@
 
     const btn = makeBtn('Отправить', 'var(--tg-theme-button-color,#2481cc)', () => {
       ctaResponse.price_comment = textarea.value.trim();
-      transitionTo(() => renderCtaContact());
+      finishAll();
     });
     btn.id = 'cta-send-btn';
     screen.appendChild(btn);
