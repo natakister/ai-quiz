@@ -257,7 +257,7 @@
 
       const yesBtn = makeBtn('Да, держите в курсе', 'var(--tg-theme-button-color,#2481cc)', () => {
         ctaResponse.cta_reaction = 'architect_yes';
-        transitionTo(() => renderCtaContact());
+        finishAll();
       });
       const noBtn = makeBtn('Нет, спасибо', 'var(--tg-theme-secondary-bg-color,#f4f4f5)', () => {
         ctaResponse.cta_reaction = 'architect_no';
