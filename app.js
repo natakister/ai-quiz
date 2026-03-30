@@ -476,7 +476,11 @@
       else if (q.scoring === 'max') total += scoreQ4(a, q);
     });
     const avg = total / scored.length;
-    return { average: Math.round(avg * 100) / 100, level: Math.max(1, Math.min(5, Math.round(avg))) };
+    let level = Math.max(1, Math.min(5, Math.round(avg)));
+    // Architect upgrade: level 4 + Q4 includes CLAUDE.md/MCP/agents (f) → level 5
+    const q4 = answers['q4'];
+    if (level === 4 && Array.isArray(q4) && q4.includes('f')) level = 5;
+    return { average: Math.round(avg * 100) / 100, level: level };
   }
 
   function scoreQ3(sel) {
