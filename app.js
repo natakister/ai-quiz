@@ -41,7 +41,7 @@
 
   // ── Persistence ────────────────────────────────────────────────
   // Bump QUIZ_VERSION to force-clear all user data (for testing / content updates)
-  const QUIZ_VERSION = '10';
+  const QUIZ_VERSION = '11';
   const VERSION_KEY = 'ai_quiz_version';
   const PROGRESS_KEY = 'ai_quiz_progress';
   const RESULT_KEY = 'ai_quiz_result';
