@@ -443,7 +443,7 @@
 
     // Guide buttons
     const wrap = el('div', '', '', 'display:flex;flex-direction:column;gap:10px;width:100%;margin-bottom:24px;');
-    wrap.appendChild(makeCardBtn('\uD83D\uDCCB Мини-гайд: твои шаги к следующему уровню', color, () => { window.location.href = 'guide-' + level + '.html'; }));
+    wrap.appendChild(makeCardBtn('\uD83D\uDCCB Твои задания, чтобы прокачать AI-навыки', color, () => { window.location.href = 'guide-' + level + '.html'; }));
     wrap.appendChild(makeCardBtn('\uD83E\uDDF0 Подборка инструментов', color, () => { window.location.href = 'guide-' + level + '.html'; }));
     card.appendChild(wrap);
 
