@@ -73,6 +73,18 @@
   fetch('data.json').then(r => r.json()).then(data => {
     quizData = data;
     questions = data.questions;
+
+    // Bot can pass authoritative level via URL (?level=N) — wins over localStorage.
+    // This makes "Мои результаты" work on any device, even after cache wipe.
+    try {
+      const urlLevel = parseInt(new URLSearchParams(location.search).get('level'), 10);
+      if (urlLevel >= 1 && urlLevel <= 5) {
+        saveResult(urlLevel, 0);
+        renderResultCard(urlLevel);
+        return;
+      }
+    } catch(e) {}
+
     const saved = loadResult();
     if (saved && saved.level) {
       renderResultCard(saved.level);
